@@ -15,6 +15,8 @@
 srcdir = .
 top_srcdir = .
 
+NAME = p0f-relay
+
 CC ?= gcc
 CFLAGS ?= -Wall -W -g3 -O1
 LDFLAGS ?= -Wl,--as-needed
@@ -38,7 +40,11 @@ p0f-server_SOURCES = \
 	server/main.c \
 	lib/daemonize.c
 
-all:	_all
-clean:	_clean
+all:		_all
+clean:		_clean
+install:	_install
+dist:		dist-git
 
 include common.mk
+
+VERSION := 0.0.$(_git_ver)+$(_git_rev)
