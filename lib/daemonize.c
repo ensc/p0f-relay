@@ -75,12 +75,22 @@ static int drop_privilegies(struct daemonize_options const *opts)
 	return 0;
 }
 
+static void write_pid(int pid_fd, pid_t pid)
+{
+	if (pid_fd != -1)
+		dprintf(pid_fd, "%u\n", (unsigned int)pid);
+}
+
 static int daemonize(struct daemonize_options const *opts,
 		     int fd_null[2], int pid_fd)
 {
-	if (opts->mode == MODE_BACKGROUND) {
-		pid_t		pid = fork();
+	if (opts->mode != MODE_BACKGROUND)
+		write_pid(pid_fd, getpid());
+	else {
+		pid_t		pid = 0;
 		int		st;
+
+		pid = fork();
 
 		switch (pid) {
 		case -1:
@@ -112,12 +122,14 @@ static int daemonize(struct daemonize_options const *opts,
 				break;
 
 			default:
+				write_pid(pid_fd, pid);
 				_exit(0);
 			}
 
 			break;
 
 		default:
+			close(pid_fd);
 			close(fd_null[0]);
 			close(fd_null[1]);
 
@@ -134,12 +146,10 @@ static int daemonize(struct daemonize_options const *opts,
 				return -1;
 			}
 
+			_exit(0);
 			break;
 		}
 	}
-
-	if (pid_fd != -1)
-		dprintf(pid_fd, "%u\n", (unsigned int)getpid());
 
 	switch (opts->mode) {
 	case MODE_BACKGROUND:
