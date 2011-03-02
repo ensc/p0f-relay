@@ -30,14 +30,14 @@ AM_CPPFLAGS = \
 
 sbin_PROGRAMS = \
 	p0f-dispatcher \
-	p0f-server
+	p0f-connector
 
 p0f-dispatcher_SOURCES = \
 	dispatcher/main.c \
 	lib/daemonize.c
 
-p0f-server_SOURCES = \
-	server/main.c \
+p0f-connector_SOURCES = \
+	connector/main.c \
 	lib/daemonize.c
 
 all:		_all

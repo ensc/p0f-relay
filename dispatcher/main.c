@@ -94,7 +94,7 @@ static void show_help(void)
 {
 	puts("Usage: p0f-dispatch [--pidfile <filename>] [--daemon|--sigstop]\n"
 	     "  [--user|-u <username>] [--socket|-s <socket>]\n"
-	     "  [--map|-m <ipv4>=<p0f-relay-server>]*");
+	     "  [--map|-m <ipv4>=<p0f-connector>]*");
 	exit(0);
 }
 
@@ -118,7 +118,7 @@ static int add_mapping(struct cmdline_options *opts, char const *mstr)
 
 
 	if (to == NULL || to[1] == '\0') {
-		fputs("missing p0f-server\n", stderr);
+		fputs("missing p0f-connect address\n", stderr);
 		return -1;
 	}
 

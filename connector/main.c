@@ -35,7 +35,7 @@
 #endif
 
 #ifndef P0F_USER
-#  define P0F_USER	"p0f-server"
+#  define P0F_USER	"p0f-connector"
 #endif
 
 #ifndef DEFAULT_PORT
@@ -400,13 +400,13 @@ static void show_help(void)
 {
 	puts("Usage: p0f-dispatch [--pidfile <filename>] [--daemon|--sigstop]\n"
 	     "  [--user|-u <username>] [--socket|-s <socket>]\n"
-	     "  [-4|-6] [--listen|-l <port>[@<server>]]\n"
+	     "  [-4|-6] [--listen|-l <port>[@<server>]]\n");
 	exit(0);
 }
 
 static void show_version(void)
 {
-	puts("p0f-server " VERSION " -- p0f dispatcher server\n\n"
+	puts("p0f-connect " VERSION " -- p0f connector service\n\n"
 	     "Copyright (C) 2011 Enrico Scholz\n"
 	     "This program is free software; you may redistribute it under the terms of\n"
 	     "the GNU General Public License.  This program has absolutely no warranty.");
