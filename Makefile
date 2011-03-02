@@ -18,7 +18,7 @@ top_srcdir = .
 NAME = p0f-relay
 
 CC ?= gcc
-CFLAGS ?= -Wall -W -g3 -O1
+CFLAGS ?= -Wall -W -g3 -O1 -D_FORTIFY_SOURCE=2 -fstack-protector
 LDFLAGS ?= -Wl,--as-needed
 
 AM_CFLAGS = -std=gnu99
