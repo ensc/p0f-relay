@@ -85,8 +85,8 @@ static struct option const CMDLINE_OPTIONS[] = {
 	{ "daemon",      no_argument,       NULL, CMD_DAEMON },
 	{ "sigstop",     no_argument,       NULL, CMD_SIGSTOP },
 	{ "strict",      no_argument,       NULL, CMD_STRICT },
-	{ "chroot",      no_argument,       NULL, CMD_CHROOT },
-	{ "pidfile",     no_argument,       NULL, CMD_PIDFILE },
+	{ "chroot",      required_argument, NULL, CMD_CHROOT },
+	{ "pidfile",     required_argument, NULL, CMD_PIDFILE },
 	{ "user",        required_argument, NULL, 'u' },
 	{ NULL, 0, NULL, 0}
 };
