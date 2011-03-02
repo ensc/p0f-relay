@@ -39,7 +39,7 @@
 #include <common/io.h>
 
 #ifndef DISPATCHER_SOCKFILE
-#  define DISPATCHER_SOCKFILE	LOCALSTATEDIR "/run/p0frun/sock"
+#  define DISPATCHER_SOCKFILE	LOCALSTATEDIR "/run/p0f-dispatcher/sock"
 #endif
 
 #ifndef DISPATCHER_USER
