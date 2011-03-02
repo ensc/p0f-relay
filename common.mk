@@ -122,7 +122,7 @@ _git_rev = $(shell $(GIT) rev-parse --verify --short HEAD)
 _git_ver = $(shell $(GIT) rev-list $(_git_rev) | wc -l)
 
 dist-git:
-		$(MAKE) .dist DIST_MODE=git pkg_prefix='$(NAME)-g$(_git_ver)+$(_git_rev)' GIT_REV='${_git_rev}'
+		$(MAKE) .dist DIST_MODE=git pkg_prefix='$(NAME)-$(VERSION)' GIT_REV='${_git_rev}'
 
 ifeq ($(DIST_MODE),git)
 .dist:		$(pkg_prefix).tar
