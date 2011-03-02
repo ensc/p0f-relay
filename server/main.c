@@ -400,13 +400,13 @@ static void show_help(void)
 {
 	puts("Usage: p0f-dispatch [--pidfile <filename>] [--daemon|--sigstop]\n"
 	     "  [--user|-u <username>] [--socket|-s <socket>]\n"
-	     "  [--map|-m <ipv4>=<p0f-relay-server>]*");
+	     "  [-4|-6] [--listen|-l <port>[@<server>]]\n"
 	exit(0);
 }
 
 static void show_version(void)
 {
-	puts("p0f-dispatch " VERSION " -- p0f dispatcher agent\n\n"
+	puts("p0f-server " VERSION " -- p0f dispatcher server\n\n"
 	     "Copyright (C) 2011 Enrico Scholz\n"
 	     "This program is free software; you may redistribute it under the terms of\n"
 	     "the GNU General Public License.  This program has absolutely no warranty.");
