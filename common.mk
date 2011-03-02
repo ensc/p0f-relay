@@ -118,6 +118,9 @@ _clean:
 		rm -f $(addprefix $(O),.*.dep */.*.dep)
 		-rmdir $(O)
 
+_distclean:	_clean
+		rm -f $(O)version.mk
+
 _git_rev = $(shell $(GIT) rev-parse --verify --short HEAD)
 _git_ver = $(shell $(GIT) rev-list $(_git_rev) | wc -l)
 
@@ -127,14 +130,26 @@ dist-git:
 ifeq ($(DIST_MODE),git)
 .dist:		$(pkg_prefix).tar
 
-$(pkg_prefix).tar:	.$(pkg_prefix).tar
+$(pkg_prefix).tar:	.$(pkg_prefix).tar $(EXTRA_DIST)
 		rm -f $@
-		$(TAR) rf $< --transform='s!^$(O)!!' $(EXTRA_DIST) --owner root --group root --mode u+w,g-w,a+rX --mtime=now
+		$(TAR) rf $< --transform='s!^$(O)!${pkg_prefix}/!' $(sort $(EXTRA_DIST)) --owner root --group root --mode u+w,g-w,a+rX --mtime=now
 		mv $< $@
 
 .$(pkg_prefix).tar:
 		rm -f $@
 		$(GIT) archive --format=tar --prefix='${pkg_prefix}/' '${GIT_REV}' -o $@
+endif
+
+EXTRA_DIST += $(O)version.mk
+
+$(O)version.mk:
+		mkdir -p $(@D)
+		rm -f $@
+		echo "VERSION := 0.0.$(_git_ver)+$(_git_rev)" >> $@
+		chmod a-w "$@"
+
+ifneq ($(wildcard $(top_srcdir)/.git/HEAD),)
+$(O)version.mk:	$(top_srcdir)/.git/objects $(top_srcdir)/.git/HEAD
 endif
 
 .PHONY:		_clean_common _all _install install-exec

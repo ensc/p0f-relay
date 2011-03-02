@@ -42,9 +42,9 @@ p0f-connector_SOURCES = \
 
 all:		_all
 clean:		_clean
+mrproper:	_distclean
 install:	_install
 dist:		dist-git
 
 include common.mk
-
-VERSION := 0.0.$(_git_ver)+$(_git_rev)
+-include $(O)version.mk
