@@ -168,9 +168,6 @@ static int add_mapping(struct cmdline_options *opts, char const *mstr)
 		return -1;
 	}
 
-	printf("mapping[%zu] = %s / %s / %s (%s, %s)\n", opts->num_mappings,
-	       inet_ntoa(m.dst_addr), m.node, m.service, from, port);
-
 	new_mappings[opts->num_mappings++] = m;
 	opts->mappings = new_mappings;
 
@@ -241,10 +238,6 @@ static struct p0f_mapping const *find_mapping(struct cmdline_options const *opts
 
 	for (i = 0; i < opts->num_mappings; ++i) {
 		struct in_addr			q_addr = { q->dst_ad };
-
-		printf("  %zu: %s", i, inet_ntoa(q_addr));
-		printf(" vs %s\n", inet_ntoa(opts->mappings[i].dst_addr));
-
 
 		if (memcmp(&q_addr, &opts->mappings[i].dst_addr, sizeof q_addr) == 0)
 			return &opts->mappings[i];
@@ -345,20 +338,6 @@ static void handle_query(struct cmdline_options const *opts, int s)
 
 	if (query.magic != QUERY_MAGIC)
 		goto err;
-
-	{
-		char	buf[128];
-		size_t	l;
-
-		l = sprintf(buf, "%s:%u -> ",
-			    inet_ntoa(*(struct in_addr *)&query.src_ad),
-			    ntohs(query.src_port));
-
-		sprintf(buf + l, "%s:%u",
-			inet_ntoa(*(struct in_addr *)&query.dst_ad),
-			ntohs(query.dst_port));
-		printf("query: %s\n", buf);
-	}
 
 	mapping = find_mapping(opts, &query);
 	if (mapping != NULL) {
