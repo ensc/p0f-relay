@@ -162,7 +162,7 @@ int ensc_daemonize(struct daemonize_options const *opts)
 	if (opts->pidfile) {
 		unlink(opts->pidfile);	/* ignore errors */
 		pid_fd = open(opts->pidfile,
-			      O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+			      O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
 		if (pid_fd < 0) {
 			perror("open(<pidfile>)");

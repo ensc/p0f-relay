@@ -25,6 +25,16 @@ typedef uint32_t	be32_t;
 typedef uint16_t	be16_t;
 typedef uint8_t		be8_t;
 
+#if defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2,9)
+#  include <endian.h>
+#else
+#  include <arpa/inet.h>
+#  define htobe32	htonl
+#  define htobe16	htons
+#  define be32toh	htonl
+#  define be16toh	htons
+#endif
+
 struct p0f_rpc_query {
 	be32_t		src_addr;
 	be32_t		dst_addr;
