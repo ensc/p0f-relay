@@ -14,6 +14,14 @@
 
 GIT ?= git
 TAR ?= tar
+XZ ?= xz
+GZIP ?= gzip
+BZIP2 ?= bzip2
+
+XZ_FLAGS ?= -e -9
+BZIP2_FLAGS ?= -9
+
+TARBALL_TYPES ?= .xz .bz2 .gz
 
 BUILD_CC ?= $(CC)
 BUILD_CPPFLAGS ?= $(CPPFLAGS)
@@ -128,23 +136,38 @@ dist-git:
 		$(MAKE) .dist DIST_MODE=git pkg_prefix='$(NAME)-$(VERSION)' GIT_REV='${_git_rev}'
 
 ifeq ($(DIST_MODE),git)
-.dist:		$(pkg_prefix).tar
+.dist:		$(addprefix $(pkg_prefix).tar,$(TARBALL_TYPES))
 
 $(pkg_prefix).tar:	.$(pkg_prefix).tar $(EXTRA_DIST)
-		rm -f $@
+		@rm -f $@
 		$(TAR) rf $< --transform='s!^$(O)!${pkg_prefix}/!' $(sort $(EXTRA_DIST)) --owner root --group root --mode u+w,g-w,a+rX --mtime=now
 		mv $< $@
 
 .$(pkg_prefix).tar:
-		rm -f $@
+		@rm -f $@
 		$(GIT) archive --format=tar --prefix='${pkg_prefix}/' '${GIT_REV}' -o $@
 endif
+
+%.xz:		%
+		@rm -f $@ $@.tmp
+		$(XZ) $(XZ_FLAGS) -c -z < $< > $@.tmp
+		mv $@.tmp $@
+
+%.gz:		%
+		@rm -f $@ $@.tmp
+		$(GZIP) $(GZIP_FLAGS) -c < $< > $@.tmp
+		mv $@.tmp $@
+
+%.bz2:		%
+		@rm -f $@ $@.tmp
+		$(BZIP2) $(BZIP2_FLAGS) -c < $< > $@.tmp
+		mv $@.tmp $@
 
 EXTRA_DIST += $(O)version.mk
 
 $(O)version.mk:
-		mkdir -p $(@D)
-		rm -f $@
+		@mkdir -p $(@D)
+		@rm -f $@
 		echo "VERSION := 0.0.$(_git_ver)+$(_git_rev)" >> $@
 		chmod a-w "$@"
 
