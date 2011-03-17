@@ -194,6 +194,12 @@ int ensc_daemonize(struct daemonize_options const *opts)
 	if (opts->user[0] != '\0' && drop_privilegies(opts) < 0)
 		goto err;
 
+	/* we did not called drop_privilegies() which goes into '/' */
+	if (opts->user[0] == '\0' && chdir("/") < 0) {
+		perror("chdir(\"/\")");
+		goto err;
+	}
+
 	if (daemonize(opts, fd_null, pid_fd) < 0)
 		goto err;
 
