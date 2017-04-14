@@ -23,6 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <getopt.h>
 #include <unistd.h>
@@ -33,7 +34,7 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 
-#include <p0f-relay/p0f-query.h>
+#include <p0f-relay/api.h>
 #include <p0f-relay/rpc.h>
 #include <common/daemonize.h>
 #include <common/io.h>
@@ -61,7 +62,11 @@ enum {
 };
 
 struct p0f_mapping {
-	struct in_addr			dst_addr;
+	unsigned char			af_family;
+	union {
+		struct in_addr		ip4;
+		struct in6_addr		ip6;
+	}				dstX_addr;
 	char const			*node;
 	char const			*service;
 };
@@ -142,7 +147,19 @@ static int add_mapping(struct cmdline_options *opts, char const *mstr)
 		port = DEFAULT_PORT;
 	}
 
-	if (inet_pton(AF_INET, from, &m.dst_addr) < 0) {
+	if (strncmp(from, "ipv4:", 5) == 0) {
+		m.af_family = AF_INET;
+		from += 5;
+	} else if (strncmp(from, "ipv6:", 5) == 0) {
+		m.af_family = AF_INET6;
+		from += 5;
+	} else if (strchr(from, ':') != NULL) {
+		m.af_family = AF_INET6;
+	} else {
+		m.af_family = AF_INET;
+	}
+
+	if (inet_pton(m.af_family, from, &m.dstX_addr) < 0) {
 		perror("inet_pton()");
 		return -1;
 	}
@@ -232,15 +249,48 @@ static int set_sighandlers(void)
 	return 0;
 }
 
+static sa_family_t p0f_addr_to_sa_family(u8 addr_type)
+{
+	switch (addr_type) {
+	case P0F_ADDR_IPV4:
+		return AF_INET;
+	case P0F_ADDR_IPV6:
+		return AF_INET6;
+	default:
+		return AF_UNSPEC;
+	}
+}
+
 static struct p0f_mapping const *find_mapping(struct cmdline_options const *opts,
-					      struct p0f_query const *q)
+					      struct p0f_api_query const *q,
+					      uint8_t const *host)
 {
 	size_t		i;
 
-	for (i = 0; i < opts->num_mappings; ++i) {
-		struct in_addr			q_addr = { q->dst_ad };
+	if (!host && opts->num_mappings == 1)
+		return &opts->mappings[0];
 
-		if (memcmp(&q_addr, &opts->mappings[i].dst_addr, sizeof q_addr) == 0)
+	for (i = 0; i < opts->num_mappings; ++i) {
+		size_t		sa_len;
+
+		if (p0f_addr_to_sa_family(q->addr_type) !=
+		    opts->mappings[i].af_family)
+			continue;
+
+		switch (opts->mappings[i].af_family) {
+		case AF_INET:
+			sa_len = sizeof opts->mappings[i].dstX_addr.ip4;
+			break;
+
+		case AF_INET6:
+			sa_len = sizeof opts->mappings[i].dstX_addr.ip6;
+			break;
+
+		default:
+			continue;
+		}
+
+		if (memcmp(host, &opts->mappings[i].dstX_addr, sa_len) == 0)
 			return &opts->mappings[i];
 	}
 
@@ -248,17 +298,20 @@ static struct p0f_mapping const *find_mapping(struct cmdline_options const *opts
 }
 
 union response_local {
-	struct p0f_response	r;
-	struct p0f_status	s;
+	struct p0f_api_response	r;
 } __packed;
 
-static ssize_t receive_response(int s, union response_local *dst,
-				unsigned int query_id)
+#define _copy_fields(a, b, field) do { \
+		static_assert(sizeof (a)->field == sizeof (b)->field, \
+			      "differently sized attributes"); \
+		memcpy((a)->field, (b)->field, sizeof (a)->field); \
+	} while(0)
+
+static ssize_t receive_response(int s, union response_local *dst)
 {
 	union {
 		be32_t				type;
 		struct p0f_rpc_response		r;
-		struct p0f_rpc_status		s;
 	} __packed				msg;
 	be32_t					len;
 	ssize_t					dst_len;
@@ -268,45 +321,36 @@ static ssize_t receive_response(int s, union response_local *dst,
 		return -1;
 
 	switch (be32toh(msg.type)) {
-	case P0F_RPC_MSG_RESPONSE:
+	case 0:
 		dst_len       = sizeof dst->r;
 
-		dst->r.magic  = QUERY_MAGIC;
-		dst->r.id     = query_id;
-		dst->r.type   = msg.r.result;
-		dst->r.fw     = msg.r.fw;
-		dst->r.nat    = msg.r.nat;
-		dst->r.real   = msg.r.real;
+		dst->r = (struct p0f_api_response) {
+			.magic		= P0F_RESP_MAGIC,
+			.status		= be32toh(msg.r.status),
 
-		dst->r.dist   = msg.r.dist;
-		dst->r.score  = be16toh(msg.r.score);
-		dst->r.mflags = be16toh(msg.r.mflags);
-		dst->r.uptime = be32toh(msg.r.uptime);
+			.first_seen	= be32toh(msg.r.first_seen),
+			.last_seen	= be32toh(msg.r.last_seen),
+			.total_conn	= be32toh(msg.r.total_conn),
 
-		memcpy(dst->r.genre,  msg.r.genre,  sizeof dst->r.genre);
-		memcpy(dst->r.detail, msg.r.detail, sizeof dst->r.detail);
-		memcpy(dst->r.link,   msg.r.link,   sizeof dst->r.link);
-		memcpy(dst->r.tos,    msg.r.tos,    sizeof dst->r.tos);
+			.uptime_min	= be32toh(msg.r.uptime_min),
+			.up_mod_days	= be32toh(msg.r.up_mod_days),
 
-		break;
+			.last_nat	= be32toh(msg.r.last_nat),
+			.last_chg	= be32toh(msg.r.last_chg),
 
-	case P0F_RPC_MSG_STATUS:
-		dst_len          = sizeof dst->s;
+			.distance	= be16toh(msg.r.distance),
 
-		dst->s.magic     = QUERY_MAGIC;
-		dst->s.id        = query_id;
-		dst->s.type      = RESP_STATUS;
+			.bad_sw		= msg.r.bad_sw,
+			.os_match_q	= msg.r.os_match_q,
+		};
 
-		dst->s.mode      = msg.s.mode;
-		dst->s.fp_cksum  = be32toh(msg.s.fp_cksum);
-		dst->s.cache     = be32toh(msg.s.cache);
-		dst->s.packets   = be32toh(msg.s.packets);
-		dst->s.matched   = be32toh(msg.s.matched);
-		dst->s.queries   = be32toh(msg.s.queries);
-		dst->s.cmisses   = be32toh(msg.s.cmisses);
-		dst->s.uptime    = be32toh(msg.s.uptime);
+		_copy_fields(&dst->r, &msg.r, os_name);
+		_copy_fields(&dst->r, &msg.r, os_flavor);
+		_copy_fields(&dst->r, &msg.r, http_name);
+		_copy_fields(&dst->r, &msg.r, http_flavor);
+		_copy_fields(&dst->r, &msg.r, link_type);
+		_copy_fields(&dst->r, &msg.r, language);
 
-		memcpy(dst->s.version,  msg.s.version,  sizeof dst->s.version);
 		break;
 
 	default:
@@ -316,19 +360,11 @@ static ssize_t receive_response(int s, union response_local *dst,
 	return dst_len;
 }
 
-static size_t fill_error_fp(struct p0f_response	*r, unsigned int id,
-			    unsigned int code)
-{
-	r->magic = QUERY_MAGIC;
-	r->id    = id;
-	r->type  = code;
-
-	return sizeof *r;
-}
-
 static void handle_query(struct cmdline_options const *opts, int s)
 {
-	struct p0f_query		query;
+	struct p0f_api_query		query;
+	uint8_t				addr_host[16];
+	uint8_t const			*host_ptr;
 	struct p0f_mapping const	*mapping;
 	int				server_sock = -1;
 	union response_local		resp;
@@ -337,10 +373,22 @@ static void handle_query(struct cmdline_options const *opts, int s)
 	if (recv_all(s, &query, sizeof query) != 0)
 		goto err;
 
-	if (query.magic != QUERY_MAGIC)
-		goto err;
+	switch (query.magic) {
+	case P0F_QUERY_MAGIC:
+		host_ptr = NULL;
+		break;
 
-	mapping = find_mapping(opts, &query);
+	case P0F_QUERY_MAGIC_EXT:
+		if (!recv_all(s, &addr_host, sizeof addr_host))
+			goto err;
+		host_ptr = addr_host;
+		break;
+
+	default:
+		goto err;
+	}
+
+	mapping = find_mapping(opts, &query, host_ptr);
 	if (mapping != NULL) {
 		struct addrinfo const		hints = {
 			.ai_family	=  (opts->prefer_ip4 ? AF_INET :
@@ -381,34 +429,31 @@ static void handle_query(struct cmdline_options const *opts, int s)
 	memset(&resp, 0, sizeof resp);
 
 	if (server_sock != -1) {
-		struct p0f_rpc_query const	q = {
-			.src_addr	=  query.src_ad,
-			.dst_addr	=  query.dst_ad,
-			.src_port	=  query.src_port,
-			.dst_port	=  query.dst_port,
-			.type		=  query.type,
+		struct p0f_rpc_query	q = {
+			.addr_family	=  p0f_addr_to_sa_family(query.addr_type),
 		};
+
+		static_assert(sizeof q.src_addr == sizeof query.addr,
+			      "types of src_addr and addr_peer differ");
+		memcpy(q.src_addr, query.addr, sizeof query.addr);
+
+#if 0
+		static_assert(sizeof q.dst_addr == sizeof addr_host,
+			      "types of dst_addr and addr_host differ");
+		memcpy(q.dst_addr, addr_host, sizeof addr_host);
+#endif
+
 
 		if (send_all(server_sock, &q, sizeof q) != 0)
 			resp_len = -1;
 		else
-			resp_len = receive_response(server_sock, &resp, query.id);
+			resp_len = receive_response(server_sock, &resp);
 
 		close(server_sock);
 	}
 
-	if (resp_len == -1) {
-		switch (query.type) {
-		case QTYPE_FINGERPRINT:
-			resp_len = fill_error_fp(&resp.r, query.id, RESP_NOMATCH);
-			break;
-
-		case QTYPE_STATUS:
-		default:
-			resp_len = 0;
-			break;
-		}
-	}
+	if (resp_len == -1)
+		goto err;
 
 	if (send_all(s, &resp, resp_len) != 0)
 		goto err;

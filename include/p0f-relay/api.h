@@ -38,6 +38,14 @@ struct p0f_api_query {
 
 } __attribute__((packed));
 
+#define P0F_QUERY_MAGIC_EXT  0x50304603
+struct p0f_api_query_ext {
+  u32 magic;                            /* Must be P0F_QUERY_MAGIC            */
+  u8  addr_type;                        /* P0F_ADDR_*                         */
+  u8  addr_peer[16];                    /* IP address (big endian left align) */
+  u8  addr_host[16];
+} __attribute__((packed));
+
 struct p0f_api_response {
 
   u32 magic;                            /* Must be P0F_RESP_MAGIC             */

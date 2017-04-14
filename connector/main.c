@@ -21,12 +21,13 @@
 #include <string.h>
 #include <getopt.h>
 #include <signal.h>
+#include <assert.h>
 #include <netdb.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 
-#include <p0f-relay/p0f-query.h>
 #include <p0f-relay/rpc.h>
+#include <p0f-relay/api.h>
 #include <common/daemonize.h>
 #include <common/io.h>
 
@@ -199,25 +200,35 @@ static int open_listen_sock(struct cmdline_options const *opts)
 
 static uint32_t	query_id;
 
-static int send_response(int s, struct p0f_response const *resp)
+#define _copy_fields(a, b, field) do { \
+		static_assert(sizeof (a)->field == sizeof (b)->field, \
+			      "differently sized attributes"); \
+		memcpy((a)->field, (b)->field, sizeof (a)->field); \
+	} while(0)
+
+static int send_response(int s, struct p0f_api_response const *resp)
 {
 	struct p0f_rpc_response		rpc = {
-		.type	=  htobe32(P0F_RPC_MSG_RESPONSE),
-		.uptime =  htobe32(resp->uptime),
-		.score	=  htobe16(resp->score),
-		.mflags	=  htobe16(resp->mflags),
-		.fw	=  resp->fw,
-		.nat	=  resp->nat,
-		.real	=  resp->real,
-		.result	=  resp->type,
-		.dist	=  resp->dist,
+		.status		= htobe32(resp->status),
+		.first_seen	= htobe32(resp->first_seen),
+		.last_seen	= htobe32(resp->last_seen),
+		.total_conn	= htobe32(resp->total_conn),
+		.uptime_min	= htobe32(resp->uptime_min),
+		.up_mod_days	= htobe32(resp->up_mod_days),
+		.last_nat	= htobe32(resp->last_nat),
+		.last_chg	= htobe32(resp->last_chg),
+		.distance	= htobe16(resp->distance),
+		.bad_sw		= resp->bad_sw,
+		.os_match_q	= resp->os_match_q,
 	};
 	be32_t const			len = htobe32(sizeof rpc);
 
-	memcpy(rpc.detail, resp->detail, sizeof rpc.detail);
-	memcpy(rpc.genre,  resp->genre,  sizeof rpc.genre);
-	memcpy(rpc.link,   resp->link,   sizeof rpc.link);
-	memcpy(rpc.tos,    resp->tos,    sizeof rpc.tos);
+	_copy_fields(&rpc, resp, os_name);
+	_copy_fields(&rpc, resp, os_flavor);
+	_copy_fields(&rpc, resp, http_name);
+	_copy_fields(&rpc, resp, http_flavor);
+	_copy_fields(&rpc, resp, link_type);
+	_copy_fields(&rpc, resp, language);
 
 	if (send_all(s, &len, sizeof len) != 0 ||
 	    send_all(s, &rpc, sizeof rpc) != 0)
@@ -226,28 +237,16 @@ static int send_response(int s, struct p0f_response const *resp)
 	return 0;
 }
 
-static int send_status(int s, struct p0f_status const *st)
+static sa_family_t sa_family_to_p0f_addr(u8 af_family)
 {
-	struct p0f_rpc_status		rpc = {
-		.type		=  htobe32(P0F_RPC_MSG_STATUS),
-		.fp_cksum	=  htobe32(st->fp_cksum),
-		.cache		=  htobe32(st->cache),
-		.packets	=  htobe32(st->packets),
-		.matched	=  htobe32(st->matched),
-		.queries	=  htobe32(st->queries),
-		.cmisses	=  htobe32(st->cmisses),
-		.uptime		=  htobe32(st->uptime),
-		.mode		=  st->mode
-	};
-	be32_t const			len = htobe32(sizeof rpc);
-
-	memcpy(rpc.version, st->version, sizeof rpc.version);
-
-	if (send_all(s, &len, sizeof len) != 0 ||
-	    send_all(s, &rpc, sizeof rpc) != 0)
-		return -1;
-
-	return 0;
+	switch (af_family) {
+	case AF_INET:
+		return P0F_ADDR_IPV4;
+	case AF_INET6:
+		return P0F_ADDR_IPV6;
+	default:
+		return 0;
+	}
 }
 
 static void handle_query(struct cmdline_options const *opts, int s,
@@ -255,7 +254,6 @@ static void handle_query(struct cmdline_options const *opts, int s,
 {
 	int			p0f_fd = -1;
 	struct p0f_rpc_query	q;
-	int			rc;
 
 	(void)opts;
 
@@ -275,20 +273,13 @@ static void handle_query(struct cmdline_options const *opts, int s,
 
 	shutdown(s, SHUT_RD);
 
-	if (q.type != QTYPE_FINGERPRINT && q.type != QTYPE_STATUS)
-		goto err;
-
-	rc = 0;
 	{
-		struct p0f_query const	p0f_query = {
-			.magic		=  QUERY_MAGIC,
-			.type		=  q.type,
-			.id		=  query_id,
-			.src_ad		=  q.src_addr,
-			.dst_ad		=  q.dst_addr,
-			.src_port	=  q.src_port,
-			.dst_port	=  q.dst_port,
+		struct p0f_api_query	p0f_query = {
+			.magic		= P0F_QUERY_MAGIC,
+			.addr_type	= sa_family_to_p0f_addr(q.addr_family),
 		};
+
+		memcpy(p0f_query.addr, q.src_addr, sizeof p0f_query.addr);
 
 		if (send_all(p0f_fd, &p0f_query, sizeof p0f_query) != 0)
 			goto err;
@@ -296,9 +287,8 @@ static void handle_query(struct cmdline_options const *opts, int s,
 		shutdown(p0f_fd, SHUT_WR);
 	}
 
-	switch (q.type) {
-	case QTYPE_FINGERPRINT: {
-		struct p0f_response	resp;
+	{
+		struct p0f_api_response	resp;
 
 		if (recv_all(p0f_fd, &resp, sizeof resp) != 0)
 			goto err;
@@ -307,22 +297,6 @@ static void handle_query(struct cmdline_options const *opts, int s,
 
 		if (send_response(s, &resp) < 0)
 			goto err;
-
-		break;
-	}
-	case QTYPE_STATUS: {
-		struct p0f_status	st;
-
-		if (recv_all(p0f_fd, &st, sizeof st) != 0)
-			goto err;
-
-		shutdown(p0f_fd, SHUT_RD);
-
-		if (send_status(s, &st) < 0)
-			goto err;
-
-		break;
-	}
 	}
 
 	close(p0f_fd);
