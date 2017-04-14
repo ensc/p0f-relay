@@ -21,7 +21,9 @@ CC ?= gcc
 CFLAGS ?= -Wall -W -g3 -O1 -D_FORTIFY_SOURCE=2 -fstack-protector
 LDFLAGS ?= -Wl,--as-needed
 
-AM_CFLAGS = -std=gnu99
+CSTD = gnu11
+
+AM_CFLAGS = -std=${CSTD}
 AM_CPPFLAGS = \
 	-I $(top_srcdir)/include \
 	-D VERSION=\"$(VERSION)\" \
