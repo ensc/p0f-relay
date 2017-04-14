@@ -381,7 +381,7 @@ static void handle_query(struct cmdline_options const *opts, int s)
 		break;
 
 	case P0F_QUERY_MAGIC_EXT:
-		if (!recv_all(s, &addr_host, sizeof addr_host))
+		if (recv_all(s, &addr_host, sizeof addr_host) != 0)
 			goto err;
 		host_ptr = addr_host;
 		break;
