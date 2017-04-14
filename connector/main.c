@@ -31,6 +31,8 @@
 #include <common/daemonize.h>
 #include <common/io.h>
 
+#include <common/compat.h>
+
 #ifndef P0F_SOCKFILE
 #  define P0F_SOCKFILE	LOCALSTATEDIR "/run/p0frun/sock"
 #endif

@@ -39,6 +39,8 @@
 #include <common/daemonize.h>
 #include <common/io.h>
 
+#include <common/compat.h>
+
 #ifndef DISPATCHER_SOCKFILE
 #  define DISPATCHER_SOCKFILE	LOCALSTATEDIR "/run/p0f-dispatcher/sock"
 #endif
