@@ -16,8 +16,8 @@ addons:
       description: "Build submitted via Travis CI"
     notification_email: github@ensc.de
     build_command_prepend: "true"
-    build_command:   "make -j"
+    build_command:   "make -j CSTD=gnu99"
     branch_pattern: master
 
 script:
-- make -j
+- make -j CSTD=gnu99
