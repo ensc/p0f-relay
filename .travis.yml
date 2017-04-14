@@ -17,7 +17,7 @@ addons:
     notification_email: github@ensc.de
     build_command_prepend: "true"
     build_command:   "make -j CSTD=gnu99"
-    branch_pattern: master
+    branch_pattern: p0f3
 
 script:
 - make -j CSTD=gnu99
