@@ -77,8 +77,10 @@ static int drop_privilegies(struct daemonize_options const *opts)
 
 static void write_pid(int pid_fd, pid_t pid)
 {
-	if (pid_fd != -1)
+	if (pid_fd != -1) {
 		dprintf(pid_fd, "%u\n", (unsigned int)pid);
+		close(pid_fd);
+	}
 }
 
 static int daemonize(struct daemonize_options const *opts,
@@ -119,6 +121,8 @@ static int daemonize(struct daemonize_options const *opts,
 				_exit(1);
 
 			case 0:
+				if (pid_fd >= 0)
+					close(pid_fd);
 				break;
 
 			default:
@@ -203,8 +207,7 @@ int ensc_daemonize(struct daemonize_options const *opts)
 	if (daemonize(opts, fd_null, pid_fd) < 0)
 		goto err;
 
-	if (pid_fd != -1)
-		close(pid_fd);
+	/* daemonize() closes 'pid_fd' */
 
 	return 0;
 
