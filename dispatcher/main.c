@@ -206,7 +206,9 @@ static int open_p0f_socket(struct cmdline_options const *opts)
 		return -1;
 	}
 
-	strncpy(addr.sun_path, opts->socket_file, sizeof addr.sun_path);
+	/* do not use strncpy() here! we checked bounds above and
+	 * addr.sun_path has been zeroed at declaration */
+	strcpy(addr.sun_path, opts->socket_file);
 
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (s < 0) {

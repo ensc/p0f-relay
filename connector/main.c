@@ -325,9 +325,14 @@ static void run(struct cmdline_options const *opts, int disp_sock)
 	sigemptyset(&block_set);
 	sigaddset(&block_set, SIGCHLD);
 
+	if (strlen(opts->p0f_socket) + 1 > sizeof p0f_addr.sun_path) {
+		fputs("socket filename too long\n", stderr);
+		return;
+	}
 
-	strncpy(p0f_addr.sun_path, opts->p0f_socket,
-		sizeof p0f_addr.sun_path - 1);
+	/* do not use strncpy() here! we checked bounds above and
+	 * addr.sun_path has been zeroed at declaration */
+	strcpy(p0f_addr.sun_path, opts->p0f_socket);
 
 	(void)opts;
 	for (;;) {
