@@ -273,6 +273,8 @@ static struct p0f_mapping const *find_mapping(struct cmdline_options const *opts
 
 	if (!host && opts->num_mappings == 1)
 		return &opts->mappings[0];
+	if (!host)
+		return NULL;
 
 	for (i = 0; i < opts->num_mappings; ++i) {
 		size_t		sa_len;
