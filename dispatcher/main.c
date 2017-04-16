@@ -509,6 +509,7 @@ static void run(struct cmdline_options const *opts, int p0f_sock)
 		pid = fork();
 		if (pid == -1) {
 			perror("fork()");
+			close(s);
 			break;
 		} else if (pid == 0) {
 			close(p0f_sock);
