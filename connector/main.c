@@ -167,7 +167,10 @@ static int open_listen_sock(struct cmdline_options const *opts)
 		if (server_sock == -1)
 			continue;
 
-		setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &ONE, sizeof ONE);
+		if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR,
+			       &ONE, sizeof ONE) < 0) {
+			perror("setsockopt(<SO_REUSEADDR>)");
+		}
 
 		if (bind(server_sock, addr->ai_addr, addr->ai_addrlen) == 0)
 			break;
