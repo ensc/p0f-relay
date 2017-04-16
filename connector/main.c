@@ -366,6 +366,7 @@ static void run(struct cmdline_options const *opts, int disp_sock)
 
 		if (pid == -1) {
 			perror("fork()");
+			close(s);
 			break;
 		} else if (pid == 0) {
 			close(disp_sock);
