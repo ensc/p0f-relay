@@ -133,7 +133,8 @@ static int daemonize(struct daemonize_options const *opts,
 			break;
 
 		default:
-			close(pid_fd);
+			if (pid_fd >= 0)
+				close(pid_fd);
 			close(fd_null[0]);
 			close(fd_null[1]);
 
