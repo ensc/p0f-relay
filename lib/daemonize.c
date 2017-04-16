@@ -143,12 +143,12 @@ static int daemonize(struct daemonize_options const *opts,
 
 			if (waitpid(pid, &st, 0) < 0) {
 				perror("waitpid()");
-				return -1;
+				_exit(1);
 			}
 
 			if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
 				fputs("child exited abnormally", stderr);
-				return -1;
+				_exit(1);
 			}
 
 			_exit(0);
